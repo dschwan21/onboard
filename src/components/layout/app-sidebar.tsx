@@ -3,15 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { APP_NAVIGATION } from "@/lib/auth/config";
+import { ADMIN_NAVIGATION, APP_NAVIGATION } from "@/lib/auth/config";
 import { cn } from "@/lib/utils";
 
 export function AppSidebar({
   email,
-  role
+  role,
+  isAdmin
 }: {
   email: string;
   role: string;
+  isAdmin: boolean;
 }) {
   const pathname = usePathname();
 
@@ -54,6 +56,30 @@ export function AppSidebar({
             </Link>
           );
         })}
+        {isAdmin ? (
+          <div className="mt-6 border-t border-border pt-4">
+            <p className="px-3 pb-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+              Admin
+            </p>
+            {ADMIN_NAVIGATION.map((item) => {
+              const isActive =
+                pathname === item.href || pathname.startsWith(`${item.href}/`);
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center justify-between rounded-xl px-3 py-2 text-sm transition-colors",
+                    isActive ? "bg-primary text-primary-foreground" : "hover:bg-secondary"
+                  )}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        ) : null}
       </nav>
     </aside>
   );

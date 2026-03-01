@@ -4,13 +4,46 @@ type TableName = keyof Database["public"]["Tables"];
 type QueryClient = {
   from(table: TableName): unknown;
 };
+type Filter = {
+  column: string;
+  value: string;
+};
+type InFilter = {
+  column: string;
+  values: string[];
+};
+type OrderBy = {
+  column: string;
+  ascending?: boolean;
+};
+
+type SelectChain = {
+  eq(column: string, value: string): SelectChain;
+  in(column: string, values: string[]): SelectChain;
+  order(column: string, options?: { ascending?: boolean }): SelectChain;
+  maybeSingle(): Promise<{ data: unknown; error: { message: string } | null }>;
+  single(): Promise<{ data: unknown; error: { message: string } | null }>;
+  then<TResult1 = { data: unknown; error: { message: string } | null }, TResult2 = never>(
+    onfulfilled?:
+      | ((value: { data: unknown; error: { message: string } | null }) => TResult1 | PromiseLike<TResult1>)
+      | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
+  ): Promise<TResult1 | TResult2>;
+};
 
 type SelectQuery = {
   select(columns: string): {
-    eq(column: string, value: string): {
-      maybeSingle(): Promise<{ data: unknown; error: { message: string } | null }>;
-    };
+    eq(column: string, value: string): SelectChain;
+    in(column: string, values: string[]): SelectChain;
+    order(column: string, options?: { ascending?: boolean }): SelectChain;
+    maybeSingle(): Promise<{ data: unknown; error: { message: string } | null }>;
     single(): Promise<{ data: unknown; error: { message: string } | null }>;
+    then<TResult1 = { data: unknown; error: { message: string } | null }, TResult2 = never>(
+      onfulfilled?:
+        | ((value: { data: unknown; error: { message: string } | null }) => TResult1 | PromiseLike<TResult1>)
+        | null,
+      onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
+    ): Promise<TResult1 | TResult2>;
   };
 };
 
@@ -31,8 +64,18 @@ type UpsertQuery = {
 
 type UpdateQuery = {
   update(values: unknown): {
-    eq(column: string, value: string): Promise<{ error: { message: string } | null }>;
+    eq(column: string, value: string): UpdateChain;
   };
+};
+type UpdateChain = {
+  eq(column: string, value: string): UpdateChain;
+  in(column: string, values: string[]): UpdateChain;
+  then<TResult1 = { error: { message: string } | null }, TResult2 = never>(
+    onfulfilled?:
+      | ((value: { error: { message: string } | null }) => TResult1 | PromiseLike<TResult1>)
+      | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
+  ): Promise<TResult1 | TResult2>;
 };
 
 function asSelectQuery(client: QueryClient, table: TableName) {
@@ -64,6 +107,42 @@ export async function selectMaybeSingle<Row>(
 
   return {
     data: (response.data ?? null) as Row | null,
+    error: response.error
+  };
+}
+
+export async function selectRows<Row>(
+  client: QueryClient,
+  table: TableName,
+  columns: string,
+  options?: {
+    filters?: Filter[];
+    inFilters?: InFilter[];
+    orderBy?: OrderBy;
+  }
+) {
+  let query = asSelectQuery(client, table).select(columns) as SelectChain;
+
+  options?.filters?.forEach((filter) => {
+    query = query.eq(filter.column, filter.value);
+  });
+
+  options?.inFilters?.forEach((filter) => {
+    if (filter.values.length > 0) {
+      query = query.in(filter.column, filter.values);
+    }
+  });
+
+  if (options?.orderBy) {
+    query = query.order(options.orderBy.column, {
+      ascending: options.orderBy.ascending
+    });
+  }
+
+  const response = await query;
+
+  return {
+    data: (response.data ?? []) as Row[],
     error: response.error
   };
 }
@@ -100,4 +179,42 @@ export async function updateWhereEq(
   filter: { column: string; value: string }
 ) {
   return asUpdateQuery(client, table).update(values).eq(filter.column, filter.value);
+}
+
+export async function updateWhereFilters(
+  client: QueryClient,
+  table: TableName,
+  values: unknown,
+  options: {
+    filters?: Filter[];
+    inFilters?: InFilter[];
+  }
+) {
+  let query = asUpdateQuery(client, table).update(values).eq("id", "__noop__");
+  let initialized = false;
+
+  options.filters?.forEach((filter) => {
+    if (!initialized) {
+      query = asUpdateQuery(client, table).update(values).eq(filter.column, filter.value);
+      initialized = true;
+    } else {
+      query = query.eq(filter.column, filter.value);
+    }
+  });
+
+  options.inFilters?.forEach((filter) => {
+    if (filter.values.length === 0) {
+      return;
+    }
+
+    if (!initialized) {
+      query = asUpdateQuery(client, table).update(values).eq("id", "__noop__");
+      query = query.in(filter.column, filter.values);
+      initialized = true;
+    } else {
+      query = query.in(filter.column, filter.values);
+    }
+  });
+
+  return initialized ? query : Promise.resolve({ error: null });
 }

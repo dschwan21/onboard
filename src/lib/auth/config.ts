@@ -15,6 +15,10 @@ export const APP_NAVIGATION: readonly AppNavigationItem[] = [
   { href: "/settings", label: "Settings" }
 ] as const;
 
+export const ADMIN_NAVIGATION: readonly AppNavigationItem[] = [
+  { href: "/admin/courses", label: "Admin Courses" }
+] as const;
+
 export const USER_ROLES = ["user", "admin"] as const;
 
 export type UserRole = (typeof USER_ROLES)[number];

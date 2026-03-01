@@ -15,9 +15,18 @@ Onboard is a production-oriented Next.js SaaS foundation for helping non-technic
 
 - Email/password auth
 - Google OAuth callback flow via Supabase
+- Email verification handoff page for confirmed email signup flows
 - Authenticated app shell with sidebar navigation
-- Placeholder pages for Dashboard, Course, AI Tools, Community, Live Sessions, Library, Billing, and Settings
-- Initial Supabase schema and RLS policies
+- Real course delivery flow:
+  - course catalog with per-user progress
+  - course overview with module progress and Pro locking indicators
+  - lesson pages with markdown rendering, optional video embeds, task prompts, submissions, and completion tracking
+- Minimal admin CMS for courses and lessons:
+  - create courses
+  - edit course metadata and publishing state
+  - create and reorder modules
+  - create and edit lessons with markdown, task prompt, video URL, publish toggle, and ordering
+- Initial Supabase schema and RLS policies, plus course-delivery extensions for lesson states and lesson submissions
 - Stripe Checkout session route and webhook handler
 - Middleware protection for authenticated and Pro-only routes
 - Unified AI generation API route with persistence to `ai_generations`
@@ -61,9 +70,44 @@ Copy `.env.example` to `.env.local` and configure:
 
 1. Create a Supabase project.
 2. Enable Email auth and Google auth in the Supabase dashboard.
-3. Apply the SQL migration in [supabase/migrations/20260227130000_initial_schema.sql](/Users/derek/Desktop/onboard-llc/onboard/supabase/migrations/20260227130000_initial_schema.sql).
+3. Apply the SQL migrations in order:
+   - [supabase/migrations/20260227130000_initial_schema.sql](/Users/derek/Desktop/onboard-llc/onboard/supabase/migrations/20260227130000_initial_schema.sql)
+   - [supabase/migrations/20260301133000_course_delivery_and_admin.sql](/Users/derek/Desktop/onboard-llc/onboard/supabase/migrations/20260301133000_course_delivery_and_admin.sql)
+   - [supabase/migrations/20260301143000_fix_is_admin_rls_recursion.sql](/Users/derek/Desktop/onboard-llc/onboard/supabase/migrations/20260301143000_fix_is_admin_rls_recursion.sql)
 4. Set the site URL and redirect URL to include `http://localhost:3000/auth/callback` for local development.
 5. Run the seed example if you want starter course content.
+
+## Course features
+
+- `/course`
+  - lists published courses
+  - shows progress percentage for the signed-in user
+  - includes a resume button for the next incomplete accessible lesson
+- `/course/[courseId]`
+  - shows ordered modules and lesson counts
+  - shows completed lesson counts
+  - indicates Pro-only modules for free-tier users
+- `/course/[courseId]/[moduleId]/[lessonId]`
+  - renders lesson markdown
+  - supports optional embedded video
+  - supports optional task prompt/deliverable
+  - saves lesson submissions and completion state
+  - shows next lesson navigation
+
+## Admin features
+
+- `/admin/courses`
+  - lists all courses
+  - creates new courses
+- `/admin/courses/[courseId]`
+  - edits title, description, and published state
+  - creates modules
+  - updates module order and Pro flag
+  - creates lessons
+- `/admin/lessons/[lessonId]`
+  - edits lesson markdown, task prompt, video URL, publish state, and order
+
+Admin routes are protected server-side and only accessible to users whose profile role is `admin`.
 
 ## Stripe setup
 
@@ -86,6 +130,18 @@ Run type checking:
 
 ```bash
 npm run typecheck
+```
+
+Run tests:
+
+```bash
+npm test
+```
+
+Coverage:
+
+```bash
+npm run test:coverage
 ```
 
 ## Seed examples
@@ -147,6 +203,6 @@ Example response shape:
 
 ## Recommended next build steps
 
-1. Add actual CRUD flows for courses, groups, posts, and events.
-2. Add Stripe customer portal support for self-service billing management.
-3. Add richer AI tool definitions and UI forms that call `/api/ai`.
+1. Add destructive admin actions such as archiving or deleting courses, modules, and lessons.
+2. Add richer lesson types such as quizzes, checklists, and graded review.
+3. Add Stripe customer portal support for self-service billing management.

@@ -101,22 +101,61 @@ export type Database = {
           id: string;
           user_id: string;
           lesson_id: string;
+          state: "not_started" | "in_progress" | "completed";
+          started_at: string | null;
+          last_viewed_at: string | null;
           completed_at: string | null;
           created_at: string;
+          updated_at: string;
         };
         Insert: {
           id?: string;
           user_id: string;
           lesson_id: string;
+          state?: "not_started" | "in_progress" | "completed";
+          started_at?: string | null;
+          last_viewed_at?: string | null;
           completed_at?: string | null;
           created_at?: string;
+          updated_at?: string;
         };
         Update: {
           id?: string;
           user_id?: string;
           lesson_id?: string;
+          state?: "not_started" | "in_progress" | "completed";
+          started_at?: string | null;
+          last_viewed_at?: string | null;
           completed_at?: string | null;
           created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      lesson_submissions: {
+        Row: {
+          id: string;
+          user_id: string;
+          lesson_id: string;
+          submission_text: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          lesson_id: string;
+          submission_text: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          lesson_id?: string;
+          submission_text?: string;
+          created_at?: string;
+          updated_at?: string;
         };
         Relationships: [];
       };
@@ -153,6 +192,7 @@ export type Database = {
           course_id: string;
           title: string;
           position: number;
+          is_pro: boolean;
           created_at: string;
         };
         Insert: {
@@ -160,6 +200,7 @@ export type Database = {
           course_id: string;
           title: string;
           position: number;
+          is_pro?: boolean;
           created_at?: string;
         };
         Update: {
@@ -167,6 +208,7 @@ export type Database = {
           course_id?: string;
           title?: string;
           position?: number;
+          is_pro?: boolean;
           created_at?: string;
         };
         Relationships: [];
@@ -177,6 +219,9 @@ export type Database = {
           module_id: string;
           title: string;
           content_markdown: string | null;
+          task_prompt: string | null;
+          video_url: string | null;
+          is_published: boolean;
           position: number;
           created_at: string;
         };
@@ -185,6 +230,9 @@ export type Database = {
           module_id: string;
           title: string;
           content_markdown?: string | null;
+          task_prompt?: string | null;
+          video_url?: string | null;
+          is_published?: boolean;
           position: number;
           created_at?: string;
         };
@@ -193,6 +241,9 @@ export type Database = {
           module_id?: string;
           title?: string;
           content_markdown?: string | null;
+          task_prompt?: string | null;
+          video_url?: string | null;
+          is_published?: boolean;
           position?: number;
           created_at?: string;
         };
@@ -334,6 +385,7 @@ export type Database = {
     };
     Enums: {
       app_role: "user" | "admin";
+      lesson_state: "not_started" | "in_progress" | "completed";
     };
     CompositeTypes: Record<string, never>;
   };
