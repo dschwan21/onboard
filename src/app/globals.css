@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+  --font-body: "Avenir Next", "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --background: 40 20% 98%;
+  --foreground: 216 28% 13%;
+  --muted: 40 14% 93%;
+  --muted-foreground: 215 16% 38%;
+  --card: 0 0% 100%;
+  --card-foreground: 216 28% 13%;
+  --border: 34 17% 84%;
+  --input: 34 17% 84%;
+  --primary: 210 78% 28%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 40 26% 91%;
+  --secondary-foreground: 216 28% 13%;
+  --accent: 22 88% 56%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 72% 50%;
+  --destructive-foreground: 0 0% 100%;
+  --ring: 210 78% 28%;
+  --radius: 0.85rem;
+}
+
+* {
+  @apply border-border;
+}
+
+body {
+  @apply bg-background text-foreground antialiased;
+  font-family: var(--font-body);
+  min-height: 100vh;
+  background-image:
+    radial-gradient(circle at top left, rgba(226, 108, 45, 0.14), transparent 26%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 243, 237, 0.98));
+}
+
+a {
+  @apply text-inherit no-underline;
+}
