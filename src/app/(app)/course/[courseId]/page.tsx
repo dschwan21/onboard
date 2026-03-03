@@ -36,56 +36,39 @@ export default async function CourseDetailPage({
           </p>
         </Card>
 
-        {overview.modules.length === 0 ? (
+        {overview.lessons.length === 0 ? (
           <Card className="p-6">
             <p className="text-sm text-muted-foreground">
-              This course does not have any published modules yet.
+              This course does not have any published lessons yet.
             </p>
           </Card>
         ) : (
           <div className="space-y-4">
-            {overview.modules.map((entry) => (
-              <Card key={entry.module.id} className="space-y-4 p-6">
+            {overview.lessons.map((entry) => (
+              <Card key={entry.lesson.id} className="space-y-4 p-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-xl font-semibold">{entry.module.title}</h2>
-                      {entry.locked ? (
-                        <span className="rounded-full bg-accent/15 px-2 py-1 text-xs uppercase tracking-[0.15em] text-accent">
-                          Pro only
-                        </span>
-                      ) : null}
-                    </div>
+                    <h2 className="text-xl font-semibold">{entry.lesson.title}</h2>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      {entry.lessonCount} lessons · {entry.completionCount} completed
+                      {entry.sectionCount} sections · {entry.completionState.replace("_", " ")}
                     </p>
                   </div>
+                  <Button asChild variant="ghost">
+                    <Link href={`/course/${overview.course.id}/${entry.lesson.id}`}>Open lesson</Link>
+                  </Button>
                 </div>
 
-                {entry.lessons.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No published lessons in this module.</p>
+                {entry.sections.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No sections in this lesson yet.</p>
                 ) : (
                   <div className="space-y-2">
-                    {entry.lessons.map((lesson) => (
+                    {entry.sections.map((section) => (
                       <div
-                        key={lesson.id}
-                        className="flex items-center justify-between rounded-xl border border-border px-4 py-3"
+                        key={section.id}
+                        className="rounded-xl border border-border px-4 py-3"
                       >
-                        <div>
-                          <p className="font-medium">{lesson.title}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Lesson {lesson.position}
-                          </p>
-                        </div>
-                        {entry.locked ? (
-                          <span className="text-sm text-muted-foreground">Locked</span>
-                        ) : (
-                          <Button asChild variant="ghost">
-                            <Link href={`/course/${overview.course.id}/${entry.module.id}/${lesson.id}`}>
-                              Open lesson
-                            </Link>
-                          </Button>
-                        )}
+                        <p className="font-medium">{section.title}</p>
+                        <p className="text-sm text-muted-foreground">Section {section.position}</p>
                       </div>
                     ))}
                   </div>

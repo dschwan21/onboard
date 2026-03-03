@@ -28,7 +28,7 @@ describe("/course/[courseId] page", () => {
     requireUserMock.mockResolvedValue({ supabase: {}, user: { id: "user-1" } });
   });
 
-  it("renders module progress, completion counts, and pro locks", async () => {
+  it("renders lesson progress and section counts", async () => {
     getCourseOverviewMock.mockResolvedValue({
       course: {
         id: "course-1",
@@ -38,64 +38,63 @@ describe("/course/[courseId] page", () => {
         is_published: true,
         created_at: "2026-03-01T00:00:00.000Z"
       },
-      modules: [
+      lessons: [
         {
-          module: {
-            id: "module-1",
+          lesson: {
+            id: "lesson-1",
             course_id: "course-1",
-            title: "Step 1",
+            module_id: null,
+            title: "Lesson 1",
+            content_markdown: "",
+            task_prompt: null,
+            video_url: null,
+            is_published: true,
             position: 1,
-            is_pro: false,
             created_at: "2026-03-01T00:00:00.000Z"
           },
-          lessons: [
+          sections: [
             {
-              id: "lesson-1",
-              module_id: "module-1",
-              title: "Lesson 1",
-              content_markdown: "",
-              task_prompt: null,
-              video_url: null,
-              is_published: true,
+              id: "section-1",
+              lesson_id: "lesson-1",
+              title: "Introduction",
               position: 1,
-              created_at: "2026-03-01T00:00:00.000Z"
+              created_at: "2026-03-01T00:00:00.000Z",
+              updated_at: "2026-03-01T00:00:00.000Z"
             }
           ],
-          lessonCount: 1,
-          completionCount: 1,
-          locked: false
+          sectionCount: 1,
+          completionState: "completed"
         },
         {
-          module: {
-            id: "module-2",
+          lesson: {
+            id: "lesson-2",
             course_id: "course-1",
-            title: "Step 2",
+            module_id: null,
+            title: "Lesson 2",
+            content_markdown: "",
+            task_prompt: null,
+            video_url: null,
+            is_published: true,
             position: 2,
-            is_pro: true,
             created_at: "2026-03-01T00:00:00.000Z"
           },
-          lessons: [
+          sections: [
             {
-              id: "lesson-2",
-              module_id: "module-2",
-              title: "Lesson 2",
-              content_markdown: "",
-              task_prompt: null,
-              video_url: null,
-              is_published: true,
+              id: "section-2",
+              lesson_id: "lesson-2",
+              title: "Practice",
               position: 1,
-              created_at: "2026-03-01T00:00:00.000Z"
+              created_at: "2026-03-01T00:00:00.000Z",
+              updated_at: "2026-03-01T00:00:00.000Z"
             }
           ],
-          lessonCount: 1,
-          completionCount: 0,
-          locked: true
+          sectionCount: 1,
+          completionState: "in_progress"
         }
       ],
       progressPercentage: 50,
       totalLessons: 2,
-      completedLessons: 1,
-      hasProAccess: false
+      completedLessons: 1
     });
 
     const Page = (await import("./page")).default;
@@ -103,11 +102,10 @@ describe("/course/[courseId] page", () => {
 
     expect(screen.getByText("AI Foundations")).toBeInTheDocument();
     expect(screen.getByText("1 / 2 lessons")).toBeInTheDocument();
-    expect(screen.getByText("Pro only")).toBeInTheDocument();
-    expect(screen.getByText("Locked")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open lesson" })).toHaveAttribute(
-      "href",
-      "/course/course-1/module-1/lesson-1"
-    );
+    expect(screen.getByText("1 sections · completed")).toBeInTheDocument();
+    expect(screen.getByText("1 sections · in progress")).toBeInTheDocument();
+    expect(screen.getByText("Introduction")).toBeInTheDocument();
+    const lessonLinks = screen.getAllByRole("link", { name: "Open lesson" });
+    expect(lessonLinks[0]).toHaveAttribute("href", "/course/course-1/lesson-1");
   });
 });

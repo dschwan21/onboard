@@ -58,7 +58,7 @@ describe("/admin/courses page", () => {
         totalLessons: 0,
         completedLessons: 0,
         resumeHref: null,
-        moduleCount: 2
+        lessonCount: 2
       }
     ]);
     const Page = (await import("./page")).default;
@@ -66,7 +66,7 @@ describe("/admin/courses page", () => {
     render(await Page());
 
     expect(screen.getByText("AI Foundations")).toBeInTheDocument();
-    expect(screen.getByText("Draft · 2 modules")).toBeInTheDocument();
+    expect(screen.getByText("Draft · 2 lessons")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Manage" })).toHaveAttribute(
       "href",
       "/admin/courses/course-1"

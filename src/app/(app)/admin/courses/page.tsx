@@ -42,7 +42,7 @@ export default async function AdminCoursesPage() {
                 <div>
                   <h2 className="text-xl font-semibold">{entry.course.title}</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {entry.course.is_published ? "Published" : "Draft"} · {entry.moduleCount} modules
+                    {entry.course.is_published ? "Published" : "Draft"} · {entry.lessonCount} lessons
                   </p>
                 </div>
                 <Button asChild>

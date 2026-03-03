@@ -48,7 +48,7 @@ export default async function AuthenticatedLayout({
             </Link>
           ))}
         </nav>
-        <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
+        <main className="mx-auto w-full max-w-[1700px] px-4 py-8 lg:px-6 xl:px-8">{children}</main>
       </div>
     </div>
   );

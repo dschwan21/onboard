@@ -51,7 +51,7 @@ describe("/course page", () => {
         progressPercentage: 50,
         totalLessons: 4,
         completedLessons: 2,
-        resumeHref: "/course/course-1/module-1/lesson-3"
+        resumeHref: "/course/course-1/lesson-3"
       }
     ]);
     const Page = (await import("./page")).default;
@@ -62,7 +62,7 @@ describe("/course page", () => {
     expect(screen.getByText("50%")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Resume" })).toHaveAttribute(
       "href",
-      "/course/course-1/module-1/lesson-3"
+      "/course/course-1/lesson-3"
     );
   });
 });

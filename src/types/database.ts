@@ -159,6 +159,72 @@ export type Database = {
         };
         Relationships: [];
       };
+      lesson_blocks: {
+        Row: {
+          id: string;
+          lesson_id: string;
+          lesson_section_id: string;
+          type: "heading" | "paragraph" | "markdown" | "image" | "gif" | "youtube" | "embed";
+          content: string | null;
+          url: string | null;
+          caption: string | null;
+          position: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          lesson_id: string;
+          lesson_section_id: string;
+          type: "heading" | "paragraph" | "markdown" | "image" | "gif" | "youtube" | "embed";
+          content?: string | null;
+          url?: string | null;
+          caption?: string | null;
+          position: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          lesson_id?: string;
+          lesson_section_id?: string;
+          type?: "heading" | "paragraph" | "markdown" | "image" | "gif" | "youtube" | "embed";
+          content?: string | null;
+          url?: string | null;
+          caption?: string | null;
+          position?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      lesson_sections: {
+        Row: {
+          id: string;
+          lesson_id: string;
+          title: string;
+          position: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          lesson_id: string;
+          title: string;
+          position: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          lesson_id?: string;
+          title?: string;
+          position?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       courses: {
         Row: {
           id: string;
@@ -216,7 +282,8 @@ export type Database = {
       lessons: {
         Row: {
           id: string;
-          module_id: string;
+          module_id: string | null;
+          course_id: string;
           title: string;
           content_markdown: string | null;
           task_prompt: string | null;
@@ -227,7 +294,8 @@ export type Database = {
         };
         Insert: {
           id?: string;
-          module_id: string;
+          module_id?: string | null;
+          course_id: string;
           title: string;
           content_markdown?: string | null;
           task_prompt?: string | null;
@@ -238,7 +306,8 @@ export type Database = {
         };
         Update: {
           id?: string;
-          module_id?: string;
+          module_id?: string | null;
+          course_id?: string;
           title?: string;
           content_markdown?: string | null;
           task_prompt?: string | null;

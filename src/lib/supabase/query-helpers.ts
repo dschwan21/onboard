@@ -67,6 +67,11 @@ type UpdateQuery = {
     eq(column: string, value: string): UpdateChain;
   };
 };
+type DeleteQuery = {
+  delete(): {
+    eq(column: string, value: string): Promise<{ error: { message: string } | null }>;
+  };
+};
 type UpdateChain = {
   eq(column: string, value: string): UpdateChain;
   in(column: string, values: string[]): UpdateChain;
@@ -92,6 +97,10 @@ function asUpsertQuery(client: QueryClient, table: TableName) {
 
 function asUpdateQuery(client: QueryClient, table: TableName) {
   return client.from(table) as UpdateQuery;
+}
+
+function asDeleteQuery(client: QueryClient, table: TableName) {
+  return client.from(table) as DeleteQuery;
 }
 
 export async function selectMaybeSingle<Row>(
@@ -179,6 +188,14 @@ export async function updateWhereEq(
   filter: { column: string; value: string }
 ) {
   return asUpdateQuery(client, table).update(values).eq(filter.column, filter.value);
+}
+
+export async function deleteWhereEq(
+  client: QueryClient,
+  table: TableName,
+  filter: { column: string; value: string }
+) {
+  return asDeleteQuery(client, table).delete().eq(filter.column, filter.value);
 }
 
 export async function updateWhereFilters(

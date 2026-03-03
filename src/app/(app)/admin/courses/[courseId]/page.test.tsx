@@ -24,9 +24,8 @@ vi.mock("@/lib/courses", () => ({
 
 vi.mock("@/app/(app)/admin/actions", () => ({
   createLessonAction: vi.fn(),
-  createModuleAction: vi.fn(),
-  updateCourseAction: vi.fn(),
-  updateModuleAction: vi.fn()
+  reorderLessonsAction: vi.fn(),
+  updateCourseAction: vi.fn()
 }));
 
 describe("/admin/courses/[courseId] page", () => {
@@ -35,7 +34,7 @@ describe("/admin/courses/[courseId] page", () => {
     requireAdminMock.mockResolvedValue({ supabase: {} });
   });
 
-  it("renders course settings, module management, and lesson links", async () => {
+  it("renders course settings, lesson management, and lesson links", async () => {
     getAdminCourseDataMock.mockResolvedValue({
       course: {
         id: "course-1",
@@ -43,36 +42,46 @@ describe("/admin/courses/[courseId] page", () => {
         description: "Core course",
         is_published: true
       },
-      modules: [
+      lessons: [
         {
-          module: {
-            id: "module-1",
-            course_id: "course-1",
-            title: "Step 1",
-            position: 1,
-            is_pro: true
-          },
-          lessons: [
+          id: "lesson-1",
+          course_id: "course-1",
+          module_id: null,
+          title: "Lesson 1",
+          content_markdown: null,
+          task_prompt: null,
+          video_url: null,
+          is_published: false,
+          position: 1,
+          created_at: "2026-03-01T00:00:00.000Z"
+        }
+      ],
+      sectionsByLessonId: new Map([
+        [
+          "lesson-1",
+          [
             {
-              id: "lesson-1",
-              title: "Lesson 1",
+              id: "section-1",
+              lesson_id: "lesson-1",
+              title: "Introduction",
               position: 1,
-              is_published: false
+              created_at: "2026-03-01T00:00:00.000Z",
+              updated_at: "2026-03-01T00:00:00.000Z"
             }
           ]
-        }
-      ]
+        ]
+      ]),
+      blocksBySectionId: new Map()
     });
 
     const Page = (await import("./page")).default;
     render(await Page({ params: Promise.resolve({ courseId: "course-1" }) }));
 
-    expect(screen.getByText("Manage AI Foundations")).toBeInTheDocument();
+    expect(screen.getByText("Build AI Foundations")).toBeInTheDocument();
     expect(screen.getByText("Course settings")).toBeInTheDocument();
     expect(screen.getByDisplayValue("AI Foundations")).toBeInTheDocument();
-    expect(screen.getByText("Create module")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Step 1")).toBeInTheDocument();
-    expect(screen.getByText("Order 1 · Draft")).toBeInTheDocument();
+    expect(screen.getByText("Lesson order")).toBeInTheDocument();
+    expect(screen.getByText("1 sections · Draft")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Edit lesson" })).toHaveAttribute(
       "href",
       "/admin/lessons/lesson-1"
@@ -80,7 +89,7 @@ describe("/admin/courses/[courseId] page", () => {
     expect(screen.getByRole("button", { name: "Create lesson" })).toBeInTheDocument();
   });
 
-  it("renders the empty module state when a course has no modules", async () => {
+  it("renders the empty lesson state when a course has no lessons", async () => {
     getAdminCourseDataMock.mockResolvedValue({
       course: {
         id: "course-1",
@@ -88,12 +97,14 @@ describe("/admin/courses/[courseId] page", () => {
         description: null,
         is_published: false
       },
-      modules: []
+      lessons: [],
+      sectionsByLessonId: new Map(),
+      blocksBySectionId: new Map()
     });
 
     const Page = (await import("./page")).default;
     render(await Page({ params: Promise.resolve({ courseId: "course-1" }) }));
 
-    expect(screen.getByText("No modules yet.")).toBeInTheDocument();
+    expect(screen.getByText("No lessons yet.")).toBeInTheDocument();
   });
 });

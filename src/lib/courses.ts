@@ -1,57 +1,94 @@
 import { notFound } from "next/navigation";
 
 import {
-  buildCourseModuleSummaries,
+  buildCourseLessonSummaries,
   buildCourseSummaries,
   calculateProgress,
   findNextLessonHref,
-  hasActiveSubscription,
-  type CourseModuleSummary,
+  type CourseLessonSummary,
   type CourseSummary
 } from "@/lib/course-rules";
+import { getRenderableLessonBlocks, type LessonBlockRow } from "@/lib/lesson-blocks";
 import { selectMaybeSingle, selectRows, upsertRow } from "@/lib/supabase/query-helpers";
 import type { Database } from "@/types/database";
 
 type CourseRow = Database["public"]["Tables"]["courses"]["Row"];
-type ModuleRow = Database["public"]["Tables"]["modules"]["Row"];
 type LessonRow = Database["public"]["Tables"]["lessons"]["Row"];
+type LessonSectionRow = Database["public"]["Tables"]["lesson_sections"]["Row"];
 type LessonProgressRow = Database["public"]["Tables"]["lesson_progress"]["Row"];
 type LessonProgressInsert = Database["public"]["Tables"]["lesson_progress"]["Insert"];
 type LessonSubmissionRow = Database["public"]["Tables"]["lesson_submissions"]["Row"];
 type LessonSubmissionInsert = Database["public"]["Tables"]["lesson_submissions"]["Insert"];
 type SubscriptionRow = Database["public"]["Tables"]["subscriptions"]["Row"];
 type QueryClient = Parameters<typeof selectRows<unknown>>[0];
-type RowResult<T> = {
-  data: T[];
-};
+type RowResult<T> = { data: T[] };
 
 export type CourseOverview = {
   course: CourseRow;
-  modules: CourseModuleSummary[];
+  lessons: CourseLessonSummary[];
   progressPercentage: number;
   totalLessons: number;
   completedLessons: number;
-  hasProAccess: boolean;
 };
 
 export type LessonPageData = {
   course: CourseRow;
-  module: ModuleRow;
   lesson: LessonRow;
-  lessonsInModule: LessonRow[];
+  lessons: LessonRow[];
+  sections: LessonSectionRow[];
+  blocksBySectionId: Map<string, LessonBlockRow[]>;
   progressByLessonId: Map<string, LessonProgressRow>;
   submission: LessonSubmissionRow | null;
   nextLessonHref: string | null;
-  hasProAccess: boolean;
 };
 
-type CourseTree = {
+export type AdminCourseData = {
   course: CourseRow;
-  modules: Array<{
-    module: ModuleRow;
-    lessons: LessonRow[];
-  }>;
+  lessons: LessonRow[];
+  sectionsByLessonId: Map<string, LessonSectionRow[]>;
+  blocksBySectionId: Map<string, LessonBlockRow[]>;
 };
+
+export type AdminLessonWorkspaceData = {
+  course: CourseRow;
+  lesson: LessonRow;
+  lessons: LessonRow[];
+  sections: LessonSectionRow[];
+  sectionsByLessonId: Map<string, LessonSectionRow[]>;
+  blocksBySectionId: Map<string, LessonBlockRow[]>;
+};
+
+function mapRowsByKey<Row, Key extends string | number>(
+  rows: Row[],
+  getKey: (row: Row) => Key
+) {
+  const map = new Map<Key, Row[]>();
+
+  rows.forEach((row) => {
+    const key = getKey(row);
+    const group = map.get(key) ?? [];
+    group.push(row);
+    map.set(key, group);
+  });
+
+  return map;
+}
+
+async function getPublishedCourse(
+  supabase: QueryClient,
+  courseId: string
+) {
+  const { data: course } = await selectMaybeSingle<CourseRow>(supabase, "courses", "*", {
+    column: "id",
+    value: courseId
+  });
+
+  if (!course || !course.is_published) {
+    notFound();
+  }
+
+  return course;
+}
 
 export async function getUserSubscription(
   supabase: QueryClient,
@@ -78,79 +115,22 @@ export async function getPublishedCourseSummaries(
   }
 
   const courseIds = courses.map((course) => course.id);
-  const { data: modules } = await selectRows<ModuleRow>(supabase, "modules", "*", {
+  const { data: lessons } = await selectRows<LessonRow>(supabase, "lessons", "*", {
     inFilters: [{ column: "course_id", values: courseIds }],
+    filters: [{ column: "is_published", value: "true" }],
     orderBy: { column: "position", ascending: true }
   });
-  const moduleIds = modules.map((module) => module.id);
-  const emptyLessons: RowResult<LessonRow> = { data: [] };
-  const { data: lessons } =
-    moduleIds.length > 0
-      ? await selectRows<LessonRow>(supabase, "lessons", "*", {
-          inFilters: [{ column: "module_id", values: moduleIds }],
-          filters: [{ column: "is_published", value: "true" }],
-          orderBy: { column: "position", ascending: true }
-        })
-      : emptyLessons;
   const lessonIds = lessons.map((lesson) => lesson.id);
   const { data: progressRows } = await selectRows<LessonProgressRow>(supabase, "lesson_progress", "*", {
     filters: [{ column: "user_id", value: userId }],
     inFilters: lessonIds.length > 0 ? [{ column: "lesson_id", values: lessonIds }] : []
   });
-  const subscription = await getUserSubscription(supabase, userId);
-  const hasProAccess = hasActiveSubscription(subscription?.status);
 
   return buildCourseSummaries({
     courses,
-    modules,
     lessons,
-    progressRows,
-    hasProAccess
+    progressRows
   });
-}
-
-async function getPublishedCourseTree(
-  supabase: QueryClient,
-  courseId: string
-): Promise<CourseTree> {
-  const { data: course } = await selectMaybeSingle<CourseRow>(supabase, "courses", "*", {
-    column: "id",
-    value: courseId
-  });
-
-  if (!course || !course.is_published) {
-    notFound();
-  }
-
-  const { data: modules } = await selectRows<ModuleRow>(supabase, "modules", "*", {
-    filters: [{ column: "course_id", value: courseId }],
-    orderBy: { column: "position", ascending: true }
-  });
-  const moduleIds = modules.map((module) => module.id);
-  const emptyLessons: RowResult<LessonRow> = { data: [] };
-  const { data: lessons } =
-    moduleIds.length > 0
-      ? await selectRows<LessonRow>(supabase, "lessons", "*", {
-          inFilters: [{ column: "module_id", values: moduleIds }],
-          filters: [{ column: "is_published", value: "true" }],
-          orderBy: { column: "position", ascending: true }
-        })
-      : emptyLessons;
-  const lessonsByModuleId = new Map<string, LessonRow[]>();
-
-  lessons.forEach((lesson) => {
-    const moduleLessons = lessonsByModuleId.get(lesson.module_id) ?? [];
-    moduleLessons.push(lesson);
-    lessonsByModuleId.set(lesson.module_id, moduleLessons);
-  });
-
-  return {
-    course,
-    modules: modules.map((module) => ({
-      module,
-      lessons: (lessonsByModuleId.get(module.id) ?? []).sort((a, b) => a.position - b.position)
-    }))
-  };
 }
 
 export async function getCourseOverview(
@@ -158,30 +138,40 @@ export async function getCourseOverview(
   userId: string,
   courseId: string
 ): Promise<CourseOverview> {
-  const tree = await getPublishedCourseTree(supabase, courseId);
-  const lessonIds = tree.modules.flatMap((entry) => entry.lessons.map((lesson) => lesson.id));
+  const course = await getPublishedCourse(supabase, courseId);
+  const { data: lessons } = await selectRows<LessonRow>(supabase, "lessons", "*", {
+    filters: [
+      { column: "course_id", value: courseId },
+      { column: "is_published", value: "true" }
+    ],
+    orderBy: { column: "position", ascending: true }
+  });
+  const lessonIds = lessons.map((lesson) => lesson.id);
+  const { data: sections } =
+    lessonIds.length > 0
+      ? await selectRows<LessonSectionRow>(supabase, "lesson_sections", "*", {
+          inFilters: [{ column: "lesson_id", values: lessonIds }],
+          orderBy: { column: "position", ascending: true }
+        })
+      : ({ data: [] } as RowResult<LessonSectionRow>);
   const { data: progressRows } = await selectRows<LessonProgressRow>(supabase, "lesson_progress", "*", {
     filters: [{ column: "user_id", value: userId }],
     inFilters: lessonIds.length > 0 ? [{ column: "lesson_id", values: lessonIds }] : []
   });
-  const subscription = await getUserSubscription(supabase, userId);
-  const hasProAccess = hasActiveSubscription(subscription?.status);
-  const modules = buildCourseModuleSummaries({
-    modules: tree.modules,
-    progressRows,
-    hasProAccess
-  });
 
-  const totalLessons = modules.reduce((sum, module) => sum + module.lessonCount, 0);
-  const completedLessons = modules.reduce((sum, module) => sum + module.completionCount, 0);
+  const lessonSummaries = buildCourseLessonSummaries({
+    lessons,
+    sections,
+    progressRows
+  });
+  const completedLessons = lessonSummaries.filter((entry) => entry.completionState === "completed").length;
 
   return {
-    course: tree.course,
-    modules,
-    progressPercentage: calculateProgress(totalLessons, completedLessons),
-    totalLessons,
-    completedLessons,
-    hasProAccess
+    course,
+    lessons: lessonSummaries,
+    progressPercentage: calculateProgress(lessonSummaries.length, completedLessons),
+    totalLessons: lessonSummaries.length,
+    completedLessons
   };
 }
 
@@ -189,25 +179,44 @@ export async function getLessonPageData(
   supabase: QueryClient,
   userId: string,
   courseId: string,
-  moduleId: string,
   lessonId: string
 ): Promise<LessonPageData> {
-  const overview = await getCourseOverview(supabase, userId, courseId);
-  const moduleSummary = overview.modules.find((entry) => entry.module.id === moduleId);
-
-  if (!moduleSummary) {
-    notFound();
-  }
-
-  const lesson = moduleSummary.lessons.find((item) => item.id === lessonId);
+  const course = await getPublishedCourse(supabase, courseId);
+  const { data: lessons } = await selectRows<LessonRow>(supabase, "lessons", "*", {
+    filters: [
+      { column: "course_id", value: course.id },
+      { column: "is_published", value: "true" }
+    ],
+    orderBy: { column: "position", ascending: true }
+  });
+  const lesson = lessons.find((entry) => entry.id === lessonId);
 
   if (!lesson) {
     notFound();
   }
 
+  const lessonIds = lessons.map((entry) => entry.id);
+  const { data: sections } = await selectRows<LessonSectionRow>(supabase, "lesson_sections", "*", {
+    inFilters: [{ column: "lesson_id", values: [lesson.id] }],
+    orderBy: { column: "position", ascending: true }
+  });
+  const sectionIds = sections.map((section) => section.id);
+  const { data: blockRows } =
+    sectionIds.length > 0
+      ? await selectRows<LessonBlockRow>(supabase, "lesson_blocks", "*", {
+          inFilters: [{ column: "lesson_section_id", values: sectionIds }],
+          orderBy: { column: "position", ascending: true }
+        })
+      : ({ data: [] } as RowResult<LessonBlockRow>);
+  const blocksBySectionId = mapRowsByKey(blockRows, (row) => row.lesson_section_id);
+
+  if (blockRows.length === 0 && sections[0]) {
+    blocksBySectionId.set(sections[0].id, getRenderableLessonBlocks(lesson, []));
+  }
+
   const { data: progressRows } = await selectRows<LessonProgressRow>(supabase, "lesson_progress", "*", {
     filters: [{ column: "user_id", value: userId }],
-    inFilters: [{ column: "lesson_id", values: moduleSummary.lessons.map((item) => item.id) }]
+    inFilters: lessonIds.length > 0 ? [{ column: "lesson_id", values: lessonIds }] : []
   });
   const progressByLessonId = new Map(progressRows.map((row) => [row.lesson_id, row]));
   const { data: submissionRows } = await selectRows<LessonSubmissionRow>(
@@ -219,21 +228,20 @@ export async function getLessonPageData(
       inFilters: [{ column: "lesson_id", values: [lesson.id] }]
     }
   );
-  const submission = submissionRows[0] ?? null;
 
   return {
-    course: overview.course,
-    module: moduleSummary.module,
+    course,
     lesson,
-    lessonsInModule: moduleSummary.lessons,
+    lessons,
+    sections,
+    blocksBySectionId,
     progressByLessonId,
-    submission: submission?.user_id === userId ? submission : null,
+    submission: submissionRows[0] ?? null,
     nextLessonHref: findNextLessonHref({
       courseId,
-      modules: overview.modules,
+      lessons,
       currentLessonId: lesson.id
-    }),
-    hasProAccess: overview.hasProAccess
+    })
   };
 }
 
@@ -304,7 +312,7 @@ export async function completeLesson(
 export async function getAdminCourseData(
   supabase: QueryClient,
   courseId: string
-): Promise<CourseTree> {
+): Promise<AdminCourseData> {
   const { data: course } = await selectMaybeSingle<CourseRow>(supabase, "courses", "*", {
     column: "id",
     value: courseId
@@ -314,46 +322,48 @@ export async function getAdminCourseData(
     notFound();
   }
 
-  const { data: modules } = await selectRows<ModuleRow>(supabase, "modules", "*", {
+  const { data: lessons } = await selectRows<LessonRow>(supabase, "lessons", "*", {
     filters: [{ column: "course_id", value: courseId }],
     orderBy: { column: "position", ascending: true }
   });
-  const moduleIds = modules.map((module) => module.id);
-  const emptyLessons: RowResult<LessonRow> = { data: [] };
-  const { data: lessons } =
-    moduleIds.length > 0
-      ? await selectRows<LessonRow>(supabase, "lessons", "*", {
-          inFilters: [{ column: "module_id", values: moduleIds }],
+  const lessonIds = lessons.map((lesson) => lesson.id);
+  const { data: sections } =
+    lessonIds.length > 0
+      ? await selectRows<LessonSectionRow>(supabase, "lesson_sections", "*", {
+          inFilters: [{ column: "lesson_id", values: lessonIds }],
           orderBy: { column: "position", ascending: true }
         })
-      : emptyLessons;
-  const lessonsByModuleId = new Map<string, LessonRow[]>();
-
-  lessons.forEach((lesson) => {
-    const moduleLessons = lessonsByModuleId.get(lesson.module_id) ?? [];
-    moduleLessons.push(lesson);
-    lessonsByModuleId.set(lesson.module_id, moduleLessons);
-  });
+      : ({ data: [] } as RowResult<LessonSectionRow>);
+  const sectionIds = sections.map((section) => section.id);
+  const { data: blocks } =
+    sectionIds.length > 0
+      ? await selectRows<LessonBlockRow>(supabase, "lesson_blocks", "*", {
+          inFilters: [{ column: "lesson_section_id", values: sectionIds }],
+          orderBy: { column: "position", ascending: true }
+        })
+      : ({ data: [] } as RowResult<LessonBlockRow>);
 
   return {
     course,
-    modules: modules.map((module) => ({
-      module,
-      lessons: (lessonsByModuleId.get(module.id) ?? []).sort((a, b) => a.position - b.position)
-    }))
+    lessons,
+    sectionsByLessonId: mapRowsByKey(sections, (row) => row.lesson_id),
+    blocksBySectionId: mapRowsByKey(blocks, (row) => row.lesson_section_id)
   };
 }
 
 export async function getAdminCourses(
   supabase: QueryClient
-): Promise<Array<CourseSummary & { moduleCount: number }>> {
+): Promise<Array<CourseSummary & { lessonCount: number }>> {
   const { data: courses } = await selectRows<CourseRow>(supabase, "courses", "*", {
     orderBy: { column: "created_at", ascending: true }
   });
   const courseIds = courses.map((course) => course.id);
-  const { data: modules } = await selectRows<ModuleRow>(supabase, "modules", "*", {
-    inFilters: courseIds.length > 0 ? [{ column: "course_id", values: courseIds }] : []
-  });
+  const { data: lessons } =
+    courseIds.length > 0
+      ? await selectRows<LessonRow>(supabase, "lessons", "*", {
+          inFilters: [{ column: "course_id", values: courseIds }]
+        })
+      : ({ data: [] } as RowResult<LessonRow>);
 
   return courses.map((course) => ({
     course,
@@ -361,6 +371,38 @@ export async function getAdminCourses(
     totalLessons: 0,
     completedLessons: 0,
     resumeHref: null,
-    moduleCount: modules.filter((module) => module.course_id === course.id).length
+    lessonCount: lessons.filter((lesson) => lesson.course_id === course.id).length
   }));
+}
+
+export async function getAdminLessonWorkspaceData(
+  supabase: QueryClient,
+  lessonId: string
+): Promise<AdminLessonWorkspaceData> {
+  const { data: lesson } = await selectMaybeSingle<LessonRow>(supabase, "lessons", "*", {
+    column: "id",
+    value: lessonId
+  });
+
+  if (!lesson) {
+    notFound();
+  }
+
+  const courseData = await getAdminCourseData(supabase, lesson.course_id);
+  const currentLesson = courseData.lessons.find((entry) => entry.id === lessonId);
+
+  if (!currentLesson) {
+    notFound();
+  }
+
+  const sections = courseData.sectionsByLessonId.get(lessonId) ?? [];
+
+  return {
+    course: courseData.course,
+    lesson: currentLesson,
+    lessons: courseData.lessons,
+    sections,
+    sectionsByLessonId: courseData.sectionsByLessonId,
+    blocksBySectionId: courseData.blocksBySectionId
+  };
 }

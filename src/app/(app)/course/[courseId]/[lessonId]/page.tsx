@@ -1,9 +1,8 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
 import { markLessonCompleteAction, submitLessonAction } from "@/app/(app)/course/actions";
+import { LessonBlocksRenderer } from "@/components/course/lesson-blocks-renderer";
 import { LessonSidebar } from "@/components/course/lesson-sidebar";
-import { MarkdownContent } from "@/components/course/markdown-content";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,17 +13,13 @@ export default async function LessonPage({
   params,
   searchParams
 }: {
-  params: Promise<{ courseId: string; moduleId: string; lessonId: string }>;
+  params: Promise<{ courseId: string; lessonId: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { courseId, moduleId, lessonId } = await params;
+  const { courseId, lessonId } = await params;
   const query = await searchParams;
   const { supabase, user } = await requireUser();
-  const data = await getLessonPageData(supabase, user.id, courseId, moduleId, lessonId);
-
-  if (data.module.is_pro && !data.hasProAccess) {
-    redirect(`/course/${courseId}?locked=1`);
-  }
+  const data = await getLessonPageData(supabase, user.id, courseId, lessonId);
 
   await ensureLessonStarted(supabase, user.id, lessonId);
   if (!data.progressByLessonId.has(lessonId)) {
@@ -45,42 +40,42 @@ export default async function LessonPage({
   const nextLessonHref = typeof query.next === "string" ? query.next : data.nextLessonHref;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+    <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
       <LessonSidebar
         courseId={courseId}
-        moduleId={moduleId}
         currentLessonId={lessonId}
-        lessons={data.lessonsInModule}
+        lessons={data.lessons}
+        sections={data.sections}
         progressByLessonId={data.progressByLessonId}
       />
       <div className="space-y-6">
         <Card className="space-y-6 p-6">
           <div className="space-y-2">
-            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-              {data.course.title} / {data.module.title}
-            </p>
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{data.course.title}</p>
             <h1 className="font-[var(--font-display)] text-4xl">{data.lesson.title}</h1>
           </div>
 
-          {data.lesson.video_url ? (
-            <div className="overflow-hidden rounded-2xl border border-border">
-              <iframe
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className="aspect-video w-full"
-                src={data.lesson.video_url}
-                title={data.lesson.title}
-              />
+          {data.sections.length === 0 ? (
+            <p className="text-sm text-muted-foreground">This lesson has no sections yet.</p>
+          ) : (
+            <div className="space-y-10">
+              {data.sections.map((section) => (
+                <section id={`section-${section.id}`} key={section.id} className="space-y-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground">
+                      Section {section.position}
+                    </p>
+                    <h2 className="mt-2 font-[var(--font-display)] text-3xl">{section.title}</h2>
+                  </div>
+                  <LessonBlocksRenderer blocks={data.blocksBySectionId.get(section.id) ?? []} />
+                </section>
+              ))}
             </div>
-          ) : null}
-
-          <MarkdownContent content={data.lesson.content_markdown ?? "Lesson content coming soon."} />
+          )}
 
           {data.lesson.task_prompt ? (
             <Card className="bg-secondary/60 p-5">
-              <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground">
-                Task / Deliverable
-              </p>
+              <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground">Task / Deliverable</p>
               <p className="mt-2 whitespace-pre-wrap text-sm">{data.lesson.task_prompt}</p>
             </Card>
           ) : null}
@@ -90,7 +85,7 @@ export default async function LessonPage({
           <div>
             <h2 className="text-xl font-semibold">Submit your work</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Submitting work marks the lesson complete and updates progress across the course.
+              Completing the lesson updates your progress across the course.
             </p>
           </div>
 
@@ -111,7 +106,6 @@ export default async function LessonPage({
 
           <form action={submitLessonAction} className="space-y-4">
             <input name="courseId" type="hidden" value={courseId} />
-            <input name="moduleId" type="hidden" value={moduleId} />
             <input name="lessonId" type="hidden" value={lessonId} />
             <input name="nextLessonHref" type="hidden" value={data.nextLessonHref ?? ""} />
             <Textarea
@@ -126,7 +120,6 @@ export default async function LessonPage({
 
           <form action={markLessonCompleteAction}>
             <input name="courseId" type="hidden" value={courseId} />
-            <input name="moduleId" type="hidden" value={moduleId} />
             <input name="lessonId" type="hidden" value={lessonId} />
             <input name="nextLessonHref" type="hidden" value={data.nextLessonHref ?? ""} />
             <Button type="submit" variant="outline">

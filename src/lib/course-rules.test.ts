@@ -1,5 +1,5 @@
 import {
-  buildCourseModuleSummaries,
+  buildCourseLessonSummaries,
   buildCourseSummaries,
   buildLessonHref,
   calculateProgress,
@@ -9,8 +9,8 @@ import {
 import type { Database } from "@/types/database";
 
 type CourseRow = Database["public"]["Tables"]["courses"]["Row"];
-type ModuleRow = Database["public"]["Tables"]["modules"]["Row"];
 type LessonRow = Database["public"]["Tables"]["lessons"]["Row"];
+type LessonSectionRow = Database["public"]["Tables"]["lesson_sections"]["Row"];
 type LessonProgressRow = Database["public"]["Tables"]["lesson_progress"]["Row"];
 
 const course: CourseRow = {
@@ -22,29 +22,11 @@ const course: CourseRow = {
   created_at: "2026-03-01T00:00:00.000Z"
 };
 
-const modules: ModuleRow[] = [
-  {
-    id: "module-1",
-    course_id: "course-1",
-    title: "Step 1",
-    position: 1,
-    is_pro: false,
-    created_at: "2026-03-01T00:00:00.000Z"
-  },
-  {
-    id: "module-2",
-    course_id: "course-1",
-    title: "Step 2",
-    position: 2,
-    is_pro: true,
-    created_at: "2026-03-01T00:00:00.000Z"
-  }
-];
-
 const lessons: LessonRow[] = [
   {
     id: "lesson-1",
-    module_id: "module-1",
+    module_id: null,
+    course_id: "course-1",
     title: "Lesson 1",
     content_markdown: "Intro",
     task_prompt: null,
@@ -55,7 +37,8 @@ const lessons: LessonRow[] = [
   },
   {
     id: "lesson-2",
-    module_id: "module-1",
+    module_id: null,
+    course_id: "course-1",
     title: "Lesson 2",
     content_markdown: "Practice",
     task_prompt: null,
@@ -66,14 +49,42 @@ const lessons: LessonRow[] = [
   },
   {
     id: "lesson-3",
-    module_id: "module-2",
+    module_id: null,
+    course_id: "course-1",
     title: "Lesson 3",
     content_markdown: "Advanced",
     task_prompt: null,
     video_url: null,
     is_published: true,
-    position: 1,
+    position: 3,
     created_at: "2026-03-01T00:00:00.000Z"
+  }
+];
+
+const sections: LessonSectionRow[] = [
+  {
+    id: "section-1",
+    lesson_id: "lesson-1",
+    title: "Introduction",
+    position: 1,
+    created_at: "2026-03-01T00:00:00.000Z",
+    updated_at: "2026-03-01T00:00:00.000Z"
+  },
+  {
+    id: "section-2",
+    lesson_id: "lesson-2",
+    title: "Practice",
+    position: 1,
+    created_at: "2026-03-01T00:00:00.000Z",
+    updated_at: "2026-03-01T00:00:00.000Z"
+  },
+  {
+    id: "section-3",
+    lesson_id: "lesson-2",
+    title: "Review",
+    position: 2,
+    created_at: "2026-03-01T00:00:00.000Z",
+    updated_at: "2026-03-01T00:00:00.000Z"
   }
 ];
 
@@ -115,68 +126,49 @@ describe("course-rules", () => {
     expect(calculateProgress(3, 2)).toBe(67);
   });
 
-  it("builds course summaries and resumes at the next incomplete accessible lesson", () => {
+  it("builds course summaries and resumes at the next incomplete lesson", () => {
     const [summary] = buildCourseSummaries({
       courses: [course],
-      modules,
       lessons,
-      progressRows,
-      hasProAccess: false
+      progressRows
     });
 
     expect(summary.progressPercentage).toBe(33);
     expect(summary.completedLessons).toBe(1);
     expect(summary.totalLessons).toBe(3);
-    expect(summary.resumeHref).toBe(buildLessonHref(course.id, "module-1", "lesson-2"));
+    expect(summary.resumeHref).toBe(buildLessonHref(course.id, "lesson-2"));
   });
 
-  it("locks pro modules for free users and unlocks them for paid users", () => {
-    const freeModules = buildCourseModuleSummaries({
-      modules: [
-        { module: modules[0], lessons: lessons.filter((lesson) => lesson.module_id === "module-1") },
-        { module: modules[1], lessons: lessons.filter((lesson) => lesson.module_id === "module-2") }
-      ],
-      progressRows,
-      hasProAccess: false
+  it("builds lesson summaries with section counts and progress state", () => {
+    const lessonSummaries = buildCourseLessonSummaries({
+      lessons,
+      sections,
+      progressRows
     });
 
-    const paidModules = buildCourseModuleSummaries({
-      modules: [
-        { module: modules[0], lessons: lessons.filter((lesson) => lesson.module_id === "module-1") },
-        { module: modules[1], lessons: lessons.filter((lesson) => lesson.module_id === "module-2") }
-      ],
-      progressRows,
-      hasProAccess: true
-    });
-
-    expect(freeModules[0].locked).toBe(false);
-    expect(freeModules[1].locked).toBe(true);
-    expect(paidModules[1].locked).toBe(false);
+    expect(lessonSummaries).toHaveLength(3);
+    expect(lessonSummaries[0].sectionCount).toBe(1);
+    expect(lessonSummaries[0].completionState).toBe("completed");
+    expect(lessonSummaries[1].sectionCount).toBe(2);
+    expect(lessonSummaries[1].completionState).toBe("in_progress");
+    expect(lessonSummaries[2].sectionCount).toBe(0);
+    expect(lessonSummaries[2].completionState).toBe("not_started");
   });
 
-  it("finds the next accessible lesson href", () => {
-    const moduleSummaries = buildCourseModuleSummaries({
-      modules: [
-        { module: modules[0], lessons: lessons.filter((lesson) => lesson.module_id === "module-1") },
-        { module: modules[1], lessons: lessons.filter((lesson) => lesson.module_id === "module-2") }
-      ],
-      progressRows,
-      hasProAccess: false
-    });
-
+  it("finds the next lesson href", () => {
     expect(
       findNextLessonHref({
         courseId: course.id,
-        modules: moduleSummaries,
+        lessons,
         currentLessonId: "lesson-1"
       })
-    ).toBe(buildLessonHref(course.id, "module-1", "lesson-2"));
+    ).toBe(buildLessonHref(course.id, "lesson-2"));
 
     expect(
       findNextLessonHref({
         courseId: course.id,
-        modules: moduleSummaries,
-        currentLessonId: "lesson-2"
+        lessons,
+        currentLessonId: "lesson-3"
       })
     ).toBeNull();
   });

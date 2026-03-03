@@ -16,7 +16,7 @@ describe("route-guards", () => {
   it("identifies authenticated app routes", () => {
     expect(APP_ROUTES).toContain("/dashboard");
     expect(isAppRoute("/dashboard")).toBe(true);
-    expect(isAppRoute("/course/course-1/module-1/lesson-1")).toBe(true);
+    expect(isAppRoute("/course/course-1/lesson-1")).toBe(true);
     expect(isAppRoute("/login")).toBe(false);
   });
 

@@ -10,14 +10,13 @@ function getString(formData: FormData, key: string) {
   return String(formData.get(key) ?? "");
 }
 
-function lessonPath(courseId: string, moduleId: string, lessonId: string) {
-  return `/course/${courseId}/${moduleId}/${lessonId}`;
+function lessonPath(courseId: string, lessonId: string) {
+  return `/course/${courseId}/${lessonId}`;
 }
 
 export async function submitLessonAction(formData: FormData) {
   const { supabase, user } = await requireUser();
   const courseId = getString(formData, "courseId");
-  const moduleId = getString(formData, "moduleId");
   const lessonId = getString(formData, "lessonId");
   const submissionText = getString(formData, "submissionText");
   const nextLessonHref = getString(formData, "nextLessonHref");
@@ -26,19 +25,18 @@ export async function submitLessonAction(formData: FormData) {
 
   revalidatePath("/course");
   revalidatePath(`/course/${courseId}`);
-  revalidatePath(lessonPath(courseId, moduleId, lessonId));
+  revalidatePath(lessonPath(courseId, lessonId));
 
   if (nextLessonHref) {
-    redirect(`${lessonPath(courseId, moduleId, lessonId)}?completed=1&next=${encodeURIComponent(nextLessonHref)}`);
+    redirect(`${lessonPath(courseId, lessonId)}?completed=1&next=${encodeURIComponent(nextLessonHref)}`);
   }
 
-  redirect(`${lessonPath(courseId, moduleId, lessonId)}?completed=1`);
+  redirect(`${lessonPath(courseId, lessonId)}?completed=1`);
 }
 
 export async function markLessonCompleteAction(formData: FormData) {
   const { supabase, user } = await requireUser();
   const courseId = getString(formData, "courseId");
-  const moduleId = getString(formData, "moduleId");
   const lessonId = getString(formData, "lessonId");
   const nextLessonHref = getString(formData, "nextLessonHref");
 
@@ -46,11 +44,11 @@ export async function markLessonCompleteAction(formData: FormData) {
 
   revalidatePath("/course");
   revalidatePath(`/course/${courseId}`);
-  revalidatePath(lessonPath(courseId, moduleId, lessonId));
+  revalidatePath(lessonPath(courseId, lessonId));
 
   if (nextLessonHref) {
-    redirect(`${lessonPath(courseId, moduleId, lessonId)}?completed=1&next=${encodeURIComponent(nextLessonHref)}`);
+    redirect(`${lessonPath(courseId, lessonId)}?completed=1&next=${encodeURIComponent(nextLessonHref)}`);
   }
 
-  redirect(`${lessonPath(courseId, moduleId, lessonId)}?completed=1`);
+  redirect(`${lessonPath(courseId, lessonId)}?completed=1`);
 }

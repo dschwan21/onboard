@@ -38,19 +38,18 @@ describe("course actions", () => {
     const { submitLessonAction } = await import("./actions");
     const formData = new FormData();
     formData.set("courseId", "course-1");
-    formData.set("moduleId", "module-1");
     formData.set("lessonId", "lesson-1");
     formData.set("submissionText", "My submission");
-    formData.set("nextLessonHref", "/course/course-1/module-1/lesson-2");
+    formData.set("nextLessonHref", "/course/course-1/lesson-2");
 
     await expect(submitLessonAction(formData)).rejects.toThrow(
-      "REDIRECT:/course/course-1/module-1/lesson-1?completed=1&next=%2Fcourse%2Fcourse-1%2Fmodule-1%2Flesson-2"
+      "REDIRECT:/course/course-1/lesson-1?completed=1&next=%2Fcourse%2Fcourse-1%2Flesson-2"
     );
 
     expect(completeLessonMock).toHaveBeenCalledWith({}, "user-1", "lesson-1", "My submission");
     expect(revalidatePathMock).toHaveBeenCalledWith("/course");
     expect(revalidatePathMock).toHaveBeenCalledWith("/course/course-1");
-    expect(revalidatePathMock).toHaveBeenCalledWith("/course/course-1/module-1/lesson-1");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/course/course-1/lesson-1");
   });
 
   it("marks a lesson complete without a submission and redirects back to the lesson", async () => {
@@ -58,11 +57,10 @@ describe("course actions", () => {
     const { markLessonCompleteAction } = await import("./actions");
     const formData = new FormData();
     formData.set("courseId", "course-1");
-    formData.set("moduleId", "module-1");
     formData.set("lessonId", "lesson-1");
 
     await expect(markLessonCompleteAction(formData)).rejects.toThrow(
-      "REDIRECT:/course/course-1/module-1/lesson-1?completed=1"
+      "REDIRECT:/course/course-1/lesson-1?completed=1"
     );
 
     expect(completeLessonMock).toHaveBeenCalledWith({}, "user-1", "lesson-1");

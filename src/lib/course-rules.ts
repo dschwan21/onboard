@@ -1,8 +1,8 @@
 import type { Database } from "@/types/database";
 
 type CourseRow = Database["public"]["Tables"]["courses"]["Row"];
-type ModuleRow = Database["public"]["Tables"]["modules"]["Row"];
 type LessonRow = Database["public"]["Tables"]["lessons"]["Row"];
+type LessonSectionRow = Database["public"]["Tables"]["lesson_sections"]["Row"];
 type LessonProgressRow = Database["public"]["Tables"]["lesson_progress"]["Row"];
 
 export type CourseSummary = {
@@ -13,12 +13,11 @@ export type CourseSummary = {
   resumeHref: string | null;
 };
 
-export type CourseModuleSummary = {
-  module: ModuleRow;
-  lessons: LessonRow[];
-  lessonCount: number;
-  completionCount: number;
-  locked: boolean;
+export type CourseLessonSummary = {
+  lesson: LessonRow;
+  sections: LessonSectionRow[];
+  sectionCount: number;
+  completionState: "not_started" | "in_progress" | "completed";
 };
 
 export function hasActiveSubscription(status?: string | null) {
@@ -33,102 +32,84 @@ export function calculateProgress(totalLessons: number, completedLessons: number
   return Math.round((completedLessons / totalLessons) * 100);
 }
 
-export function buildLessonHref(courseId: string, moduleId: string, lessonId: string) {
-  return `/course/${courseId}/${moduleId}/${lessonId}`;
-}
-
-export function sortModules(modules: ModuleRow[]) {
-  return [...modules].sort((a, b) => a.position - b.position);
+export function buildLessonHref(courseId: string, lessonId: string) {
+  return `/course/${courseId}/${lessonId}`;
 }
 
 export function sortLessons(lessons: LessonRow[]) {
   return [...lessons].sort((a, b) => a.position - b.position);
 }
 
+export function sortSections(sections: LessonSectionRow[]) {
+  return [...sections].sort((a, b) => a.position - b.position);
+}
+
 export function buildCourseSummaries(params: {
   courses: CourseRow[];
-  modules: ModuleRow[];
   lessons: LessonRow[];
   progressRows: LessonProgressRow[];
-  hasProAccess: boolean;
 }): CourseSummary[] {
-  const { courses, modules, lessons, progressRows, hasProAccess } = params;
+  const { courses, lessons, progressRows } = params;
   const progressByLessonId = new Map(progressRows.map((row) => [row.lesson_id, row]));
-  const modulesByCourseId = new Map<string, ModuleRow[]>();
-  const lessonsByModuleId = new Map<string, LessonRow[]>();
-
-  modules.forEach((module) => {
-    const group = modulesByCourseId.get(module.course_id) ?? [];
-    group.push(module);
-    modulesByCourseId.set(module.course_id, group);
-  });
+  const lessonsByCourseId = new Map<string, LessonRow[]>();
 
   lessons.forEach((lesson) => {
-    const group = lessonsByModuleId.get(lesson.module_id) ?? [];
+    const group = lessonsByCourseId.get(lesson.course_id) ?? [];
     group.push(lesson);
-    lessonsByModuleId.set(lesson.module_id, group);
+    lessonsByCourseId.set(lesson.course_id, group);
   });
 
   return courses.map((course) => {
-    const orderedModules = sortModules(modulesByCourseId.get(course.id) ?? []);
-    const orderedLessons = orderedModules.flatMap((module) =>
-      sortLessons(lessonsByModuleId.get(module.id) ?? [])
-    );
-    const accessibleLessons = orderedModules.flatMap((module) => {
-      if (module.is_pro && !hasProAccess) {
-        return [];
-      }
-
-      return sortLessons(lessonsByModuleId.get(module.id) ?? []);
-    });
+    const orderedLessons = sortLessons(lessonsByCourseId.get(course.id) ?? []);
     const completedLessons = orderedLessons.filter(
       (lesson) => progressByLessonId.get(lesson.id)?.state === "completed"
     ).length;
     const resumeLesson =
-      accessibleLessons.find(
-        (lesson) => progressByLessonId.get(lesson.id)?.state !== "completed"
-      ) ?? accessibleLessons[0];
+      orderedLessons.find((lesson) => progressByLessonId.get(lesson.id)?.state !== "completed") ??
+      orderedLessons[0];
 
     return {
       course,
       progressPercentage: calculateProgress(orderedLessons.length, completedLessons),
       totalLessons: orderedLessons.length,
       completedLessons,
-      resumeHref: resumeLesson
-        ? buildLessonHref(course.id, resumeLesson.module_id, resumeLesson.id)
-        : null
+      resumeHref: resumeLesson ? buildLessonHref(course.id, resumeLesson.id) : null
     };
   });
 }
 
-export function buildCourseModuleSummaries(params: {
-  modules: Array<{ module: ModuleRow; lessons: LessonRow[] }>;
+export function buildCourseLessonSummaries(params: {
+  lessons: LessonRow[];
+  sections: LessonSectionRow[];
   progressRows: LessonProgressRow[];
-  hasProAccess: boolean;
-}): CourseModuleSummary[] {
-  const { modules, progressRows, hasProAccess } = params;
+}): CourseLessonSummary[] {
+  const { lessons, sections, progressRows } = params;
   const progressByLessonId = new Map(progressRows.map((row) => [row.lesson_id, row]));
+  const sectionsByLessonId = new Map<string, LessonSectionRow[]>();
 
-  return modules.map(({ module, lessons }) => ({
-    module,
-    lessons,
-    lessonCount: lessons.length,
-    completionCount: lessons.filter(
-      (lesson) => progressByLessonId.get(lesson.id)?.state === "completed"
-    ).length,
-    locked: module.is_pro && !hasProAccess
+  sections.forEach((section) => {
+    const group = sectionsByLessonId.get(section.lesson_id) ?? [];
+    group.push(section);
+    sectionsByLessonId.set(section.lesson_id, group);
+  });
+
+  return sortLessons(lessons).map((lesson) => ({
+    lesson,
+    sections: sortSections(sectionsByLessonId.get(lesson.id) ?? []),
+    sectionCount: (sectionsByLessonId.get(lesson.id) ?? []).length,
+    completionState: progressByLessonId.get(lesson.id)?.state ?? "not_started"
   }));
 }
 
 export function findNextLessonHref(params: {
   courseId: string;
-  modules: CourseModuleSummary[];
+  lessons: LessonRow[];
   currentLessonId: string;
 }): string | null {
-  const { courseId, modules, currentLessonId } = params;
-  const accessibleLessons = modules.flatMap((entry) => (entry.locked ? [] : entry.lessons));
-  const currentIndex = accessibleLessons.findIndex((lesson) => lesson.id === currentLessonId);
-  const nextLesson = currentIndex >= 0 ? accessibleLessons[currentIndex + 1] : null;
+  const { courseId, lessons, currentLessonId } = params;
+  const orderedLessons = sortLessons(lessons);
+  const currentIndex = orderedLessons.findIndex((lesson) => lesson.id === currentLessonId);
+  const nextLesson = currentIndex >= 0 ? orderedLessons[currentIndex + 1] : null;
 
-  return nextLesson ? buildLessonHref(courseId, nextLesson.module_id, nextLesson.id) : null;
+  return nextLesson ? buildLessonHref(courseId, nextLesson.id) : null;
 }
