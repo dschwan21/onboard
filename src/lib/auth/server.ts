@@ -29,3 +29,13 @@ export async function getCurrentUserProfile() {
 
   return { supabase, user, profile };
 }
+
+export async function requireAdmin() {
+  const context = await getCurrentUserProfile();
+
+  if (context.profile?.role !== "admin") {
+    redirect("/dashboard");
+  }
+
+  return context;
+}

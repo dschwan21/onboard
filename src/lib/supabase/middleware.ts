@@ -2,20 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 
 import { getClientEnv } from "@/lib/config/env";
+import { isAppRoute, isProRoute } from "@/lib/route-guards";
 import type { Database } from "@/types/database";
-
-const APP_ROUTES = [
-  "/dashboard",
-  "/course",
-  "/ai-tools",
-  "/community",
-  "/live-sessions",
-  "/library",
-  "/billing",
-  "/settings"
-];
-
-const PRO_ROUTES = ["/ai-tools", "/library"];
 
 export async function updateSession(request: NextRequest) {
   const response = NextResponse.next({
@@ -48,17 +36,17 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const pathname = request.nextUrl.pathname;
-  const isAppRoute = APP_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
-  const isProRoute = PRO_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+  const appRoute = isAppRoute(pathname);
+  const proRoute = isProRoute(pathname);
 
-  if (isAppRoute && !user) {
+  if (appRoute && !user) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
 
-  if (isProRoute && user) {
+  if (proRoute && user) {
     const { data: subscription } = await supabase
       .from("subscriptions")
       .select("status")
